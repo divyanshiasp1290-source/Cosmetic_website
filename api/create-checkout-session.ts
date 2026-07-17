@@ -1,7 +1,5 @@
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 function getBaseUrl() {
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
@@ -17,15 +15,42 @@ function json(status: number, payload: Record<string, unknown>): Response {
   });
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timeout after ${ms}ms: ${label}`));
+    }, ms);
+
+    promise
+      .then((v) => {
+        clearTimeout(timer);
+        resolve(v);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export default async function handler(req: Request): Promise<Response> {
+  console.log("[create-checkout-session] handler start", {
+    method: req.method,
+    url: req.url,
+  });
+
   if (req.method !== "POST") {
+    console.log("[create-checkout-session] method not allowed");
     return json(405, { success: false, error: "Method Not Allowed" });
   }
 
+  console.log("[create-checkout-session] about to parse JSON body");
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
-  } catch {
+    body = (await req.json()) as Record<string, unknown>;
+    console.log("[create-checkout-session] parsed JSON body ok", Object.keys(body ?? {}));
+  } catch (err) {
+    console.error("[create-checkout-session] req.json() failed", err);
     return json(400, { success: false, error: "Invalid JSON body" });
   }
 
@@ -39,8 +64,24 @@ export default async function handler(req: Request): Promise<Response> {
     notes: String(body.notes ?? ""),
   };
 
+  // IMPORTANT: Create Stripe client inside handler to rule out module-scope init hangs.
+  console.log("[create-checkout-session] initializing Stripe client");
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    console.error("[create-checkout-session] Missing STRIPE_SECRET_KEY");
+    return json(500, {
+      success: false,
+      error: "Server misconfigured: missing STRIPE_SECRET_KEY",
+    });
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+  console.log("[create-checkout-session] Stripe client initialized");
+
   try {
-    const session = await stripe.checkout.sessions.create({
+    console.log("[create-checkout-session] about to create Stripe checkout session");
+
+    const createPromise = stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
@@ -60,12 +101,28 @@ export default async function handler(req: Request): Promise<Response> {
       metadata,
     });
 
+    // Prevent “Pending forever” requests.
+    const session = await withTimeout(createPromise, 15000, "stripe.checkout.sessions.create");
+
+    console.log("[create-checkout-session] Stripe session created", {
+      id: session?.id,
+      url: session?.url,
+    });
+
+    if (!session?.url) {
+      console.error("[create-checkout-session] Stripe returned no session.url");
+      return json(500, { success: false, error: "Stripe session missing url" });
+    }
+
     return json(200, { url: session.url });
   } catch (error) {
-    console.error("Create checkout session error:", error);
+    console.error("[create-checkout-session] Create checkout session error:", error);
     return json(500, {
       success: false,
       error: error instanceof Error ? error.message : "Unable to create checkout session",
     });
+  } finally {
+    console.log("[create-checkout-session] handler end");
   }
 }
+
