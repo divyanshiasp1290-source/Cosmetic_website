@@ -101,11 +101,8 @@ END:VEVENT
 END:VCALENDAR
   `.trim();
 
-  await client.createCalendarObject(calendar, {
-    data: ics,
-    filename: `booking-${Date.now()}.ics`,
-    contentType: "text/calendar",
-  });
+  // tsdav typings expect only (calendar, data) in this SDK version
+  await client.createCalendarObject(calendar, ics);
 }
 
 /* ---------------- HANDLER ---------------- */

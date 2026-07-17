@@ -1,8 +1,6 @@
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-06-30.basil",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 function getEnv(name: string): string {
   const value = process.env[name];
