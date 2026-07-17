@@ -72,7 +72,10 @@ function Booking() {
       }
 
       window.localStorage.setItem("pendingBooking", JSON.stringify(data));
-      window.location.href = result.url;
+
+      // Navigate immediately; prevent any further state updates that can race with navigation.
+      window.location.assign(result.url as string);
+      return;
     } catch (error) {
       console.error(error);
       alert("Unable to start checkout. Please try again.");
