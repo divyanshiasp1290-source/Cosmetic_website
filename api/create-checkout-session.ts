@@ -42,6 +42,9 @@ export default async function handler(req: Request): Promise<Response> {
   // Global request watchdog to prevent Pending forever.
   const watchdogMs = Number(process.env.CHECKOUT_ENDPOINT_WATCHDOG_MS ?? 25000);
 
+  // Stripe calls can sometimes hang behind certain network/proxy setups.
+  // Force the whole handler to resolve with a JSON Response.
+  // Keep logic identical otherwise.
   try {
     return await withTimeout(
       (async () => {
