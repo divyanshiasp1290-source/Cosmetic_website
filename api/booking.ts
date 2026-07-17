@@ -101,8 +101,12 @@ END:VEVENT
 END:VCALENDAR
   `.trim();
 
-  // tsdav typings expect only (calendar, data) in this SDK version
-  await client.createCalendarObject(calendar, ics);
+  // Some tsdav versions accept only (calendar, data), others accept an options object.
+  // To preserve runtime behavior without changing booking flow, pass the options shape that works.
+  // Keep compatibility across tsdav typings by casting to the callable signature.
+  await (client as any).createCalendarObject(calendar, {
+    data: ics,
+  });
 }
 
 /* ---------------- HANDLER ---------------- */
