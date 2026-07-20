@@ -3,7 +3,6 @@ import { Instagram, Facebook, Mail, MapPin, Phone } from "lucide-react";
 
 import logoImg from "@/assets/Logo.jpeg";
 
-
 export function Footer() {
   return (
     <footer className="relative mt-32 overflow-hidden border-t border-border/60 bg-[var(--ivory)]">
@@ -17,13 +16,13 @@ export function Footer() {
               width={56}
               height={56}
               className="h-14 w-14 rounded-full bg-[var(--ivory)] object-cover shadow-soft ring-1 ring-border/60"
-
             />
             <span className="font-serif text-2xl">Dermacare Clinic</span>
           </div>
 
           <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
-            Providing personalised dermatology and aesthetic treatments to help you achieve healthy, confident, and naturally beautiful skin.
+            Providing personalised dermatology and aesthetic treatments to help you achieve healthy,
+            confident, and naturally beautiful skin.
           </p>
         </div>
 

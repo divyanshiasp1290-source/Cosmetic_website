@@ -56,11 +56,11 @@ export default async function handler(req: Request): Promise<Response> {
         console.log("[create-checkout-session] about to parse JSON body");
         let body: Record<string, unknown>;
         try {
-          body = await withTimeout(req.json() as Promise<unknown>, 5000, "req.json()") as Record<string, unknown>;
-          console.log(
-            "[create-checkout-session] parsed JSON body ok",
-            Object.keys(body ?? {}),
-          );
+          body = (await withTimeout(req.json() as Promise<unknown>, 5000, "req.json()")) as Record<
+            string,
+            unknown
+          >;
+          console.log("[create-checkout-session] parsed JSON body ok", Object.keys(body ?? {}));
         } catch (err) {
           console.error("[create-checkout-session] req.json() failed", err);
           return json(400, { success: false, error: "Invalid JSON body" });
@@ -144,4 +144,3 @@ export default async function handler(req: Request): Promise<Response> {
     console.log("[create-checkout-session] handler end");
   }
 }
-

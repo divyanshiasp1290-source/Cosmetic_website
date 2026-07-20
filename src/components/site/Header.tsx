@@ -4,7 +4,6 @@ import { Menu, X } from "lucide-react";
 
 import logoImg from "@/assets/Logo.jpeg";
 
-
 const nav = [
   { to: "/", label: "Home" },
   { to: "/about", label: "About" },
@@ -38,7 +37,7 @@ export function Header() {
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
         <Link to="/" className="group flex items-center gap-3">
-            <img
+          <img
             src={logoImg}
             alt="Dermacare Clinic logo"
             width={58}
@@ -46,15 +45,12 @@ export function Header() {
             className="h-14 w-14 rounded-full bg-[var(--ivory)] object-cover shadow-soft ring-1 ring-border/60"
           />
           <span className="flex flex-col leading-tight">
-            <span className="font-serif text-lg tracking-wide text-charcoal">
-              Dermacare Clinic
-            </span>
+            <span className="font-serif text-lg tracking-wide text-charcoal">Dermacare Clinic</span>
             <span className="text-[0.6rem] uppercase tracking-[0.32em] text-muted-foreground">
               Dermatology · Aesthetics
             </span>
           </span>
         </Link>
-
 
         <nav className="hidden items-center gap-10 md:flex">
           {nav.map((item) => (

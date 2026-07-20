@@ -64,7 +64,9 @@ function About() {
               Expert Care. <em className="not-italic gradient-text">Personalised</em> for You.
             </h1>
             <p className="mt-8 max-w-2xl text-lg leading-relaxed text-charcoal/75">
-              At Dermacare Clinic, we're passionate about helping you feel confident in your skin. Every treatment begins with understanding your needs, so we can create a personalised plan that delivers safe, effective, and natural-looking results.
+              At Dermacare Clinic, we're passionate about helping you feel confident in your skin.
+              Every treatment begins with understanding your needs, so we can create a personalised
+              plan that delivers safe, effective, and natural-looking results.
             </p>
           </Reveal>
         </div>
@@ -92,14 +94,15 @@ function About() {
             </h2>
             <div className="mt-6 space-y-5 text-charcoal/75">
               <p>
-                At Dermacare Clinic, we believe everyone deserves to feel confident in their skin. 
-                Since 2008, we've been providing personalised dermatology and aesthetic treatments with a focus on expert care, 
-                honest advice, and natural-looking results.
+                At Dermacare Clinic, we believe everyone deserves to feel confident in their skin.
+                Since 2008, we've been providing personalised dermatology and aesthetic treatments
+                with a focus on expert care, honest advice, and natural-looking results.
               </p>
               <p>
-                Over the years, we've helped countless patients achieve healthier skin through advanced treatments 
-                tailored to their individual needs. Our experienced team is committed to creating a welcoming environment 
-                where every patient feels heard, supported, and cared for.
+                Over the years, we've helped countless patients achieve healthier skin through
+                advanced treatments tailored to their individual needs. Our experienced team is
+                committed to creating a welcoming environment where every patient feels heard,
+                supported, and cared for.
               </p>
             </div>
           </Reveal>

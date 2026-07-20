@@ -101,8 +101,8 @@ function Contact() {
               Get in touch <em className="not-italic gradient-text">with</em> Dermacare Clinic.
             </h1>
             <p className="mt-8 max-w-2xl text-lg leading-relaxed text-charcoal/75">
-              Your journey to healthier skin starts with a conversation. 
-              Tell us how we can help, and we'll be happy to guide you through the next steps.
+              Your journey to healthier skin starts with a conversation. Tell us how we can help,
+              and we'll be happy to guide you through the next steps.
             </p>
           </Reveal>
         </div>

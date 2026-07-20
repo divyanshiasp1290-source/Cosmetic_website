@@ -30,7 +30,9 @@ function PaymentSuccess() {
         const searchParams = new URLSearchParams(window.location.search);
         const sessionId = searchParams.get("session_id") ?? "";
         const completedSessions = window.localStorage.getItem("completedStripeSessions");
-        const completedSessionIds = completedSessions ? JSON.parse(completedSessions) as string[] : [];
+        const completedSessionIds = completedSessions
+          ? (JSON.parse(completedSessions) as string[])
+          : [];
 
         if (sessionId && completedSessionIds.includes(sessionId)) {
           if (isMounted) {
@@ -41,7 +43,9 @@ function PaymentSuccess() {
         }
 
         const pendingBookingRaw = window.localStorage.getItem("pendingBooking");
-        const pendingBooking = pendingBookingRaw ? (JSON.parse(pendingBookingRaw) as BookingPayload) : null;
+        const pendingBooking = pendingBookingRaw
+          ? (JSON.parse(pendingBookingRaw) as BookingPayload)
+          : null;
 
         if (!pendingBooking) {
           throw new Error("No pending booking found.");
@@ -65,7 +69,10 @@ function PaymentSuccess() {
         if (sessionId) {
           window.localStorage.setItem(
             "completedStripeSessions",
-            JSON.stringify([...completedSessionIds.filter((item) => item !== sessionId), sessionId]),
+            JSON.stringify([
+              ...completedSessionIds.filter((item) => item !== sessionId),
+              sessionId,
+            ]),
           );
         }
 
@@ -81,7 +88,9 @@ function PaymentSuccess() {
         console.error(error);
         if (isMounted) {
           setStatus("error");
-          setMessage(error instanceof Error ? error.message : "Unable to confirm your appointment.");
+          setMessage(
+            error instanceof Error ? error.message : "Unable to confirm your appointment.",
+          );
           window.localStorage.removeItem("pendingBooking");
         }
       }
@@ -103,7 +112,11 @@ function PaymentSuccess() {
             <CheckCircle2 size={32} />
           </div>
           <h1 className="mt-8 font-serif text-4xl">
-            {status === "success" ? "Appointment Confirmed" : status === "error" ? "Payment Received" : "Processing Your Booking"}
+            {status === "success"
+              ? "Appointment Confirmed"
+              : status === "error"
+                ? "Payment Received"
+                : "Processing Your Booking"}
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-charcoal/70">{message}</p>
           <div className="mt-8 flex justify-center">

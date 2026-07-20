@@ -214,7 +214,10 @@ function Field({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={inputId} className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
+      <label
+        htmlFor={inputId}
+        className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground"
+      >
         {label}
         {required && " *"}
       </label>

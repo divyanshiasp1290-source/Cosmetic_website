@@ -117,7 +117,9 @@ function Home() {
               Healthy, <em className="not-italic gradient-text">Beautiful Skin</em> Starts Here.
             </h1>
             <p className="mt-7 max-w-xl text-base leading-relaxed text-charcoal/75 sm:text-lg">
-              Beautiful skin isn't about changing who you are—it's about feeling your best. Our personalised cosmetic dermatology treatments are designed to enhance your natural features with expert care and subtle, natural-looking results.
+              Beautiful skin isn't about changing who you are—it's about feeling your best. Our
+              personalised cosmetic dermatology treatments are designed to enhance your natural
+              features with expert care and subtle, natural-looking results.
             </p>
             <div className="mt-10 grid max-w-md gap-3 sm:flex sm:flex-wrap sm:items-center sm:gap-4">
               <Link to="/booking" className="btn-gold w-full sm:w-auto">
@@ -177,8 +179,8 @@ function Home() {
           <Reveal>
             <div className="eyebrow">Signature Treatments</div>
             <h2 className="mt-6 max-w-2xl font-serif text-4xl leading-tight sm:text-5xl">
-                Expert Care. <em className="not-italic gradient-text">Personalised Treatments.</em>{" "}
-                Natural Results.
+              Expert Care. <em className="not-italic gradient-text">Personalised Treatments.</em>{" "}
+              Natural Results.
             </h2>
           </Reveal>
           <Reveal delay={150}>
@@ -243,7 +245,9 @@ function Home() {
               Expert Care <em className="not-italic gradient-text">You Can</em> Trust
             </h2>
             <p className="mt-5 max-w-lg text-charcoal/75">
-              We believe great skin starts with expert care and a personalised approach. Every treatment is carefully planned to suit your skin, your concerns, and your goals—helping you achieve healthy, natural-looking results you can feel confident in.
+              We believe great skin starts with expert care and a personalised approach. Every
+              treatment is carefully planned to suit your skin, your concerns, and your
+              goals—helping you achieve healthy, natural-looking results you can feel confident in.
             </p>
             <ul className="mt-10 space-y-6">
               {whyUs.map((w) => (
@@ -321,7 +325,8 @@ function Home() {
               Your most radiant skin is waiting to be revealed.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-[oklch(0.22_0.005_60)]/75">
-              Book a consultation with our specialists, and we'll create a personalised treatment plan based on your skin, concerns, and goals.
+              Book a consultation with our specialists, and we'll create a personalised treatment
+              plan based on your skin, concerns, and goals.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link

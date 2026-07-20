@@ -41,11 +41,14 @@ export default async function handler(req: Request): Promise<Response> {
         stripeSessionId: session.id,
       };
 
-      const bookingResponse = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:8080"}/api/booking`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingPayload),
-      });
+      const bookingResponse = await fetch(
+        `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:8080"}/api/booking`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bookingPayload),
+        },
+      );
 
       if (!bookingResponse.ok) {
         const errorText = await bookingResponse.text().catch(() => "");

@@ -14,4 +14,3 @@ export async function post(req: Request): Promise<Response> {
   // bookingApi returns a Response already
   return (bookingApi as any)(fakeReq);
 }
-
