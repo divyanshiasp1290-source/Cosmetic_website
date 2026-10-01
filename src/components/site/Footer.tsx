@@ -34,6 +34,7 @@ export function Footer() {
               ["/about", "About"],
               ["/services", "Services"],
               ["/contact", "Contact"],
+              ["/privacy-policy", "Privacy Policy"],
             ].map(([to, label]) => (
               <li key={to}>
                 <Link to={to} className="transition-colors hover:text-[var(--rose)]">
@@ -65,8 +66,16 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-border/50">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 px-6 py-2 text-xs text-muted-foreground lg:flex-row lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-4 text-xs text-muted-foreground sm:flex-row lg:px-10">
           <p>© {new Date().getFullYear()} Dermacare Clinic. All rights reserved.</p>
+          <div>
+            <Link
+              to="/privacy-policy"
+              className="transition-colors hover:text-charcoal underline underline-offset-4"
+            >
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
