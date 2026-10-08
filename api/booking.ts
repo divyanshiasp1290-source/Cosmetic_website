@@ -1,11 +1,17 @@
 import nodemailer from "nodemailer";
 import { google } from "googleapis";
+import {
+  isValidPhoneNumber,
+  formatPhoneNumber,
+  isBookingDateAllowed,
+  formatPostalCode,
+} from "./validation.ts";
 
 type BookingRequestBody = {
   fullName: unknown;
   email: unknown;
   phone: unknown;
-
+  postalCode?: unknown;
   service: unknown;
   date: unknown;
   time: unknown;
@@ -88,7 +94,7 @@ export default async function handler(
   let body: BookingRequestBody;
 
   try {
-    body = await req.json();
+    body = (await req.json()) as BookingRequestBody;
   } catch {
     return json(400, { success: false, error: "Invalid JSON body" });
   }
@@ -97,7 +103,7 @@ export default async function handler(
     return json(400, { success: false, error: "Invalid JSON body" });
   }
 
-  const { fullName, email, phone, service, date, time, notes, stripeSessionId } = body;
+  const { fullName, email, phone, postalCode, service, date, time, notes, stripeSessionId } = body;
 
   if (!isNonEmptyString(fullName)) return json(400, { success: false, error: "fullName required" });
 
@@ -105,14 +111,28 @@ export default async function handler(
 
   if (!isNonEmptyString(phone)) return json(400, { success: false, error: "phone required" });
 
+  if (!isValidPhoneNumber(phone)) {
+    return json(400, { success: false, error: "Valid 10-digit phone number required" });
+  }
+
   if (!isNonEmptyString(service)) return json(400, { success: false, error: "service required" });
 
   if (!isNonEmptyString(date)) return json(400, { success: false, error: "date required" });
 
   if (!isNonEmptyString(time)) return json(400, { success: false, error: "time required" });
 
-  const safeNotes = isNonEmptyString(notes) ? notes : "-";
+  if (!isBookingDateAllowed(date)) {
+    return json(400, {
+      success: false,
+      error: "Appointments cannot be booked for today. Please select tomorrow or a later date.",
+    });
+  }
+
   const normalizedSessionId = isNonEmptyString(stripeSessionId) ? stripeSessionId : null;
+
+  const formattedPhone = formatPhoneNumber(phone);
+  const formattedPostal = isNonEmptyString(postalCode) ? formatPostalCode(postalCode) : "-";
+  const safeNotes = isNonEmptyString(notes) ? notes : "-";
 
   if (normalizedSessionId && processedBookingSessions.has(normalizedSessionId)) {
     return json(200, { success: true });
@@ -140,7 +160,8 @@ export default async function handler(
         text: `
 Name: ${fullName}
 Email: ${email}
-Phone: ${phone}
+Phone: ${formattedPhone}
+Postal Code: ${formattedPostal}
 Service: ${service}
 Date: ${date}
 Time: ${time}
@@ -173,7 +194,7 @@ We will contact you soon.
     const googleClientSecret = requireGoogleEnv("GOOGLE_CLIENT_SECRET");
     const googleRefreshToken = requireGoogleEnv("GOOGLE_REFRESH_TOKEN");
     const googleCalendarId = requireGoogleEnv("GOOGLE_CALENDAR_ID");
-    const googleTimezone = process.env.GOOGLE_TIMEZONE || "America/Toronto";
+    const googleTimezone = process.env.GOOGLE_TIMEZONE || "America/Vancouver";
 
     const oauth2Client = new google.auth.OAuth2(googleClientId, googleClientSecret, undefined);
     oauth2Client.setCredentials({ refresh_token: googleRefreshToken });
@@ -191,11 +212,10 @@ We will contact you soon.
       return `${end.getUTCFullYear()}-${pad(end.getUTCMonth() + 1)}-${pad(end.getUTCDate())}T${pad(end.getUTCHours())}:${pad(end.getUTCMinutes())}:00`;
     })();
 
-
     const event = {
       summary: `Dermacare Consultation - ${service}`,
 
-      description: `Booking details:\n\nName: ${fullName}\nEmail: ${email}\nPhone: ${phone}\nService: ${service}\nDate: ${date}\nTime: ${time}\nNotes: ${safeNotes}`,
+      description: `Booking details:\n\nName: ${fullName}\nEmail: ${email}\nPhone: ${formattedPhone}\nPostal Code: ${formattedPostal}\nService: ${service}\nDate: ${date}\nTime: ${time}\nNotes: ${safeNotes}`,
       start: {
         dateTime: startDateTime,
         timeZone: googleTimezone,

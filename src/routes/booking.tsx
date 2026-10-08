@@ -1,10 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useMemo, useEffect, type FormEvent } from "react";
 import { ArrowRight, Mail, MapPin, Phone, Clock, Check } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { Reveal } from "@/components/site/Reveal";
 import { services } from "@/components/site/data";
+import {
+  getClinicDates,
+  getMinBookingDate,
+  isBookingDateAllowed,
+  isValidPhoneNumber,
+  formatPhoneNumber,
+  isWithinServiceArea,
+  formatPostalCode,
+  CLINIC_TIME_SLOTS,
+  formatTimeSlotLabel,
+} from "@/lib/validation";
 
 export const Route = createFileRoute("/booking")({
   head: () => ({
@@ -36,8 +47,91 @@ const hours = [["Monday – Sunday", "10:00 AM – 18:00 PM"]];
 
 function Booking() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [postalCode, setPostalCode] = useState<string>("");
+  const [availabilitySlots, setAvailabilitySlots] = useState<
+    Array<{ time: string; label: string; available: boolean }> | null
+  >(null);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+
+  const minBookingDate = useMemo(() => getMinBookingDate(), []);
+  const clinicSlots = useMemo(
+    () =>
+      CLINIC_TIME_SLOTS.map((t) => ({
+        time: t,
+        label: formatTimeSlotLabel(t),
+        available: true,
+      })),
+    [],
+  );
+
   const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
   const isStripeConfigured = Boolean(stripePublishableKey);
+
+  const fetchAvailability = async (date: string) => {
+    if (!date || !isBookingDateAllowed(date)) {
+      setAvailabilitySlots(null);
+      setAvailabilityError(null);
+      setIsLoadingAvailability(false);
+      return;
+    }
+
+    setIsLoadingAvailability(true);
+    setAvailabilityError(null);
+
+    try {
+      const res = await fetch(`/api/availability?date=${encodeURIComponent(date)}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Unable to check appointment availability.");
+      }
+
+      const slots: Array<{ time: string; label: string; available: boolean }> =
+        data.slots || [];
+      setAvailabilitySlots(slots);
+
+      // If currently selected time is booked on this date, clear it
+      setSelectedTime((currentSelectedTime) => {
+        if (!currentSelectedTime) return "";
+        const matched = slots.find((s) => s.time === currentSelectedTime);
+        return matched && matched.available ? currentSelectedTime : "";
+      });
+    } catch (err) {
+      console.error("[availability] fetch error:", err);
+      setAvailabilityError(
+        err instanceof Error ? err.message : "Unable to load time slot availability.",
+      );
+      setAvailabilitySlots(null);
+    } finally {
+      setIsLoadingAvailability(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate && isBookingDateAllowed(selectedDate)) {
+      fetchAvailability(selectedDate);
+    } else {
+      setAvailabilitySlots(null);
+      setAvailabilityError(null);
+      setIsLoadingAvailability(false);
+    }
+  }, [selectedDate]);
+
+  const onDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    setSelectedTime("");
+    if (newDate && !isBookingDateAllowed(newDate)) {
+      setErrorMessage(
+        "Appointments cannot be booked for today. Please select tomorrow or a later date.",
+      );
+    } else {
+      setErrorMessage(null);
+    }
+  };
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,11 +142,50 @@ function Booking() {
       fullName: (form.elements.namedItem("name") as HTMLInputElement).value.trim(),
       email: (form.elements.namedItem("email") as HTMLInputElement).value.trim(),
       phone: (form.elements.namedItem("phone") as HTMLInputElement).value.trim(),
+      postalCode: (
+        (form.elements.namedItem("postalCode") as HTMLInputElement)?.value || postalCode
+      ).trim(),
       service: (form.elements.namedItem("service") as HTMLSelectElement).value,
-      date: (form.elements.namedItem("date") as HTMLInputElement).value,
-      time: (form.elements.namedItem("time") as HTMLInputElement).value,
+      date: selectedDate,
+      time: selectedTime,
       notes: (form.elements.namedItem("message") as HTMLTextAreaElement).value.trim(),
     };
+
+    if (!isValidPhoneNumber(data.phone)) {
+      setErrorMessage("Please enter a valid 10-digit phone number.");
+      return;
+    }
+
+    const serviceAreaCheck = isWithinServiceArea(data.postalCode);
+    if (!serviceAreaCheck.isEligible) {
+      setErrorMessage(
+        serviceAreaCheck.message ||
+          "Dermacare Clinic serves clients within ~20 km of our Vancouver atelier (920 W King Edward Ave).",
+      );
+      return;
+    }
+
+    if (!isBookingDateAllowed(data.date)) {
+      setErrorMessage(
+        "Appointments cannot be booked for today. Please select tomorrow or a later date.",
+      );
+      return;
+    }
+
+    if (!data.time) {
+      setErrorMessage("Please select an available appointment time slot.");
+      return;
+    }
+
+    const selectedSlotObj = availabilitySlots?.find((s) => s.time === data.time);
+    if (selectedSlotObj && !selectedSlotObj.available) {
+      setErrorMessage("The selected time slot is already booked. Please choose an available time slot.");
+      return;
+    }
+
+    data.phone = formatPhoneNumber(data.phone);
+    data.postalCode = formatPostalCode(data.postalCode);
+    setErrorMessage(null);
 
     try {
       setIsSubmitting(true);
@@ -78,7 +211,9 @@ function Booking() {
       return;
     } catch (error) {
       console.error(error);
-      alert("Unable to start checkout. Please try again.");
+      const message =
+        error instanceof Error ? error.message : "Unable to start checkout. Please try again.";
+      setErrorMessage(message);
       setIsSubmitting(false);
     }
   };
@@ -134,6 +269,18 @@ function Booking() {
 
               <Field label="Phone" name="phone" type="tel" required />
 
+              <Field
+                label="Postal Code (Greater Vancouver Area)"
+                name="postalCode"
+                placeholder="e.g. V5Z 2E2"
+                required
+                value={postalCode}
+                onChange={(e) => {
+                  setPostalCode(e.target.value);
+                  setErrorMessage(null);
+                }}
+              />
+
               <div className="flex flex-col gap-2">
                 <label
                   htmlFor="service"
@@ -160,13 +307,117 @@ function Booking() {
                   <option>Microdermabrasion</option>
                   <option>Face Sculpt</option>
                   <option>Dermaplaning</option>
-                  <option>LED Light Therapyn</option>
+                  <option>LED Light Therapy</option>
                 </select>
               </div>
 
-              <Field label="Date" name="date" type="date" required />
+              <Field
+                label="Date"
+                name="date"
+                type="date"
+                required
+                min={minBookingDate}
+                value={selectedDate}
+                onChange={(e) => onDateChange(e.target.value)}
+              />
 
-              <Field label="Time" name="time" type="time" required />
+              {/* SELECTABLE APPOINTMENT TIME SLOTS */}
+              <div className="sm:col-span-2 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
+                    Appointment Time Slot *
+                  </label>
+                  {selectedTime && (
+                    <span className="text-xs font-medium text-[var(--gold)]">
+                      Selected: {formatTimeSlotLabel(selectedTime)}
+                    </span>
+                  )}
+                </div>
+
+                <input type="hidden" name="time" value={selectedTime} />
+
+                {!selectedDate ? (
+                  <div className="rounded-xl border border-dashed border-border/80 bg-background/50 p-6 text-center text-sm text-muted-foreground">
+                    Please select an appointment date above to view available time slots.
+                  </div>
+                ) : !isBookingDateAllowed(selectedDate) ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-center text-sm font-medium text-rose-700">
+                    Appointments cannot be booked for today. Please select tomorrow or a later date.
+                  </div>
+                ) : isLoadingAvailability ? (
+                  <div className="rounded-xl border border-dashed border-border/80 bg-background/50 p-8 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-2.5">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--gold)] border-t-transparent" />
+                    <span>Checking clinic schedule for {selectedDate}…</span>
+                  </div>
+                ) : availabilityError ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-center text-sm font-medium text-rose-700 flex flex-col items-center gap-2">
+                    <span>{availabilityError}</span>
+                    <button
+                      type="button"
+                      onClick={() => fetchAvailability(selectedDate)}
+                      className="text-xs font-semibold underline text-rose-800 hover:text-rose-950 transition-colors"
+                    >
+                      Retry Availability
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    {(availabilitySlots || clinicSlots).map((slot) => {
+                      const isSelected = selectedTime === slot.time;
+                      const isBooked = !slot.available;
+
+                      if (isBooked) {
+                        return (
+                          <button
+                            key={slot.time}
+                            type="button"
+                            disabled
+                            aria-disabled="true"
+                            title="This appointment slot is already booked"
+                            className="flex flex-col items-center justify-center rounded-xl py-3 px-2 text-sm font-medium border border-border/50 bg-muted/40 text-muted-foreground/50 cursor-not-allowed opacity-60 transition-all select-none"
+                          >
+                            <span className="line-through">{slot.label}</span>
+                            <span className="mt-0.5 text-[0.65rem] uppercase tracking-wider font-semibold text-rose-600/80">
+                              Booked
+                            </span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={slot.time}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTime(slot.time);
+                            setErrorMessage(null);
+                          }}
+                          className={`flex flex-col items-center justify-center rounded-xl py-3 px-2 text-sm font-medium transition-all ${
+                            isSelected
+                              ? "bg-[oklch(0.25_0.02_60)] text-white shadow-md ring-2 ring-[var(--gold)] ring-offset-2"
+                              : "border border-border bg-background text-charcoal hover:border-[var(--gold)] hover:bg-[var(--sand)]/30"
+                          }`}
+                        >
+                          <span>{slot.label}</span>
+                          <span
+                            className={`mt-0.5 text-[0.65rem] uppercase tracking-wider ${
+                              isSelected
+                                ? "text-[var(--gold)] font-semibold"
+                                : "text-emerald-600 font-medium"
+                            }`}
+                          >
+                            {isSelected ? "Selected" : "Available"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                  Dermacare Clinic serves clients within approximately 20 km of our Vancouver
+                  atelier (920 W King Edward Ave). Bookings can be made starting tomorrow onward.
+                </p>
+              </div>
 
               <div className="sm:col-span-2 flex flex-col gap-2">
                 <label className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
@@ -181,6 +432,12 @@ function Booking() {
                 />
               </div>
 
+              {errorMessage ? (
+                <div className="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-center text-sm font-medium text-rose-700">
+                  {errorMessage}
+                </div>
+              ) : null}
+
               <button
                 type="submit"
                 className="btn-gold sm:col-span-2 mt-2 disabled:cursor-not-allowed disabled:opacity-70"
@@ -189,6 +446,17 @@ function Booking() {
               >
                 Pay $25 & Confirm Appointment <ArrowRight size={16} />
               </button>
+
+              <p className="sm:col-span-2 text-center text-xs text-muted-foreground mt-2">
+                By booking, you agree to Dermacare Clinic&apos;s{" "}
+                <Link
+                  to="/privacy-policy"
+                  className="underline hover:text-charcoal transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </p>
             </form>
           )}
         </div>
@@ -204,11 +472,21 @@ function Field({
   name,
   type = "text",
   required,
+  min,
+  max,
+  value,
+  placeholder,
+  onChange,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
+  min?: string;
+  max?: string;
+  value?: string;
+  placeholder?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const inputId = name;
 
@@ -226,6 +504,11 @@ function Field({
         type={type}
         name={name}
         required={required}
+        min={min}
+        max={max}
+        value={value}
+        placeholder={placeholder}
+        onChange={onChange}
         className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-charcoal focus:border-[var(--gold)] focus:outline-none"
       />
     </div>

@@ -12,6 +12,7 @@ type BookingPayload = {
   fullName: string;
   email: string;
   phone: string;
+  postalCode?: string;
   service: string;
   date: string;
   time: string;

@@ -5,6 +5,7 @@ import { renderErrorPage } from "./lib/error-page";
 import bookingApi from "../api/booking";
 import createCheckoutSessionApi from "../api/create-checkout-session";
 import stripeWebhookApi from "../api/stripe-webhook";
+import availabilityApi from "../api/availability";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -71,6 +72,10 @@ export default {
         };
 
         return (createCheckoutSessionApi as any)(fakeReq, {});
+      }
+
+      if (url.pathname === "/api/availability" && request.method === "GET") {
+        return (availabilityApi as any)(request, {});
       }
 
       if (url.pathname === "/api/stripe-webhook" && request.method === "POST") {

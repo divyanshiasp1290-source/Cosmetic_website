@@ -1,4 +1,12 @@
 import Stripe from "stripe";
+import {
+  isValidPhoneNumber,
+  formatPhoneNumber,
+  isBookingDateAllowed,
+  isWithinServiceArea,
+  formatPostalCode,
+  isClinicTimeSlot,
+} from "./validation.ts";
 
 function getBaseUrl() {
   if (process.env.VERCEL_URL) {
@@ -66,14 +74,65 @@ export default async function handler(req: Request): Promise<Response> {
           return json(400, { success: false, error: "Invalid JSON body" });
         }
 
+        const fullName = String(body.fullName ?? "").trim();
+        const email = String(body.email ?? "").trim();
+        const rawPhone = String(body.phone ?? "").trim();
+        const rawPostalCode = String(body.postalCode ?? "").trim();
+        const service = String(body.service ?? "").trim();
+        const date = String(body.date ?? "").trim();
+        const time = String(body.time ?? "").trim();
+        const notes = String(body.notes ?? "").trim();
+
+        if (!fullName || !email || !rawPhone || !rawPostalCode || !service || !date || !time) {
+          return json(400, {
+            success: false,
+            error: "All required booking fields, including postal code, must be provided.",
+          });
+        }
+
+        if (!isValidPhoneNumber(rawPhone)) {
+          return json(400, {
+            success: false,
+            error: "Please enter a valid 10-digit phone number.",
+          });
+        }
+
+        const serviceAreaCheck = isWithinServiceArea(rawPostalCode);
+        if (!serviceAreaCheck.isEligible) {
+          return json(400, {
+            success: false,
+            error:
+              serviceAreaCheck.message || "Postal code is outside our local service area (~20 km).",
+          });
+        }
+
+        if (!isBookingDateAllowed(date)) {
+          return json(400, {
+            success: false,
+            error:
+              "Appointments cannot be booked for today. Please select tomorrow or a later date.",
+          });
+        }
+
+        if (!isClinicTimeSlot(time)) {
+          return json(400, {
+            success: false,
+            error: "Please select a valid appointment time during clinic operating hours.",
+          });
+        }
+
+        const phone = formatPhoneNumber(rawPhone);
+        const postalCode = formatPostalCode(rawPostalCode);
+
         const metadata = {
-          fullName: String(body.fullName ?? ""),
-          email: String(body.email ?? ""),
-          phone: String(body.phone ?? ""),
-          service: String(body.service ?? ""),
-          date: String(body.date ?? ""),
-          time: String(body.time ?? ""),
-          notes: String(body.notes ?? ""),
+          fullName,
+          email,
+          phone,
+          postalCode,
+          service,
+          date,
+          time,
+          notes,
         };
 
         console.log("[create-checkout-session] initializing Stripe client");

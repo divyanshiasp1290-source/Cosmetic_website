@@ -20,4 +20,37 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    plugins: [
+      {
+        name: "api-dev-middleware",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            if (req.url && req.url.startsWith("/api/availability") && req.method === "GET") {
+              try {
+                const { default: availabilityHandler } = await import("./api/availability.ts");
+                const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+                const webReq = new Request(url.toString(), {
+                  method: "GET",
+                  headers: req.headers as HeadersInit,
+                });
+                const response = await availabilityHandler(webReq);
+                res.statusCode = response.status;
+                response.headers.forEach((value, key) => {
+                  res.setHeader(key, value);
+                });
+                const body = await response.text();
+                res.end(body);
+                return;
+              } catch (err) {
+                next(err);
+                return;
+              }
+            }
+            next();
+          });
+        },
+      },
+    ],
+  },
 });

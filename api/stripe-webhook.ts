@@ -34,6 +34,7 @@ export default async function handler(req: Request): Promise<Response> {
         fullName: metadata.fullName ?? "",
         email: metadata.email ?? "",
         phone: metadata.phone ?? "",
+        postalCode: metadata.postalCode ?? "",
         service: metadata.service ?? "",
         date: metadata.date ?? "",
         time: metadata.time ?? "",

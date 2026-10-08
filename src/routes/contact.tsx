@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Mail, MapPin, Phone, Clock, Check } from "lucide-react";
 import { Header } from "@/components/site/Header";
@@ -6,6 +6,7 @@ import { Footer } from "@/components/site/Footer";
 import { Reveal } from "@/components/site/Reveal";
 import { services } from "@/components/site/data";
 import { WEB3FORMS_ACCESS_KEY } from "./web3forms";
+import { isValidPhoneNumber, formatPhoneNumber } from "@/lib/validation";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -49,7 +50,8 @@ function Contact() {
 
     if (!fullName) return setErrorMessage("Please enter your full name.");
     if (!email || !isEmailValid) return setErrorMessage("Please enter a valid email.");
-    if (!phone) return setErrorMessage("Please enter your phone number.");
+    if (!phone || !isValidPhoneNumber(phone))
+      return setErrorMessage("Please enter a valid 10-digit phone number.");
     if (!treatment) return setErrorMessage("Please select a treatment of interest.");
     if (!skinStory) return setErrorMessage("Please share your skin story.");
 
@@ -60,7 +62,7 @@ function Contact() {
         access_key: WEB3FORMS_ACCESS_KEY,
         name: fullName,
         email,
-        phone,
+        phone: formatPhoneNumber(phone),
         treatment,
         skin_story: skinStory,
       };
@@ -172,6 +174,16 @@ function Contact() {
                     <button type="submit" className="btn-gold sm:col-span-2 mt-2">
                       Submit Inquiry <ArrowRight size={16} />
                     </button>
+                    <p className="sm:col-span-2 text-center text-xs text-muted-foreground mt-2">
+                      Your details are handled in accordance with our{" "}
+                      <Link
+                        to="/privacy-policy"
+                        className="underline hover:text-charcoal transition-colors"
+                      >
+                        Privacy Policy
+                      </Link>
+                      .
+                    </p>
                   </form>
                 </>
               )}
