@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, type FormEvent } from "react";
-import { ArrowRight, Mail, MapPin, Phone, Clock, Check } from "lucide-react";
+import { ArrowRight, Mail, MapPin, Phone, Clock, Check, CreditCard, Calendar } from "lucide-react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { Reveal } from "@/components/site/Reveal";
@@ -21,18 +21,15 @@ export const Route = createFileRoute("/booking")({
   head: () => ({
     meta: [
       { title: "Book Consultation | Dermacare Clinic" },
-
       {
         name: "description",
         content:
           "Book your consultation at Dermacare Clinic. Select your preferred service, date, and time, and our team will confirm your appointment within one business day.",
       },
-
       {
         property: "og:title",
         content: "Book Consultation | Dermacare Clinic",
       },
-
       {
         property: "og:description",
         content:
@@ -51,6 +48,19 @@ function Booking() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [postalCode, setPostalCode] = useState<string>("");
+  const [paymentOption, setPaymentOption] = useState<"stripe" | "skip">("stripe");
+  const [isConfirmedAtClinic, setIsConfirmedAtClinic] = useState(false);
+  const [confirmedDetails, setConfirmedDetails] = useState<{
+    fullName: string;
+    email: string;
+    phone: string;
+    postalCode: string;
+    service: string;
+    date: string;
+    time: string;
+    notes: string;
+  } | null>(null);
+
   const [availabilitySlots, setAvailabilitySlots] = useState<
     Array<{ time: string; label: string; available: boolean }> | null
   >(null);
@@ -187,6 +197,48 @@ function Booking() {
     data.postalCode = formatPostalCode(data.postalCode);
     setErrorMessage(null);
 
+    // OPTION 1: "Skip" -> Directly confirms via /api/booking without Stripe
+    if (paymentOption === "skip") {
+      try {
+        setIsSubmitting(true);
+
+        const response = await fetch("/api/booking", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...data,
+            paymentStatus: "skip",
+          }),
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || "Unable to confirm your booking. Please try again.");
+        }
+
+        setConfirmedDetails(data);
+        setIsConfirmedAtClinic(true);
+        setIsSubmitting(false);
+
+        // Refresh calendar availability for the selected date
+        if (data.date) {
+          void fetchAvailability(data.date);
+        }
+        return;
+      } catch (error) {
+        console.error(error);
+        const message =
+          error instanceof Error ? error.message : "Unable to complete booking. Please try again.";
+        setErrorMessage(message);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // OPTION 2: "Pay $25 & Confirm Appointment" -> Stripe Hosted Checkout
     try {
       setIsSubmitting(true);
 
@@ -242,222 +294,334 @@ function Booking() {
 
       {/* FORM + INFO */}
       <section className="mx-auto max-w-5xl px-6 lg:px-10">
-        {/* FORM */}
-
         <div className="rounded-[2rem] bg-card p-10 shadow-luxe sm:p-12">
-          <h2 className="font-serif text-3xl">Book Consultation</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Choose your preferred service, date and time. We will confirm your appointment within
-            one business day.
-          </p>
+          {/* CONFIRMATION STATE (Skip success) */}
+          {isConfirmedAtClinic && confirmedDetails ? (
+            <div className="py-4 text-center">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-full gradient-gold text-[oklch(0.18_0.005_60)] mb-6 shadow-md">
+                <Check size={28} />
+              </div>
+              <div className="eyebrow">Consultation Reserved</div>
+              <h2 className="mt-3 font-serif text-3xl sm:text-4xl text-charcoal">
+                Booking Confirmed!
+              </h2>
+              <p className="mt-4 text-base text-charcoal/80 max-w-xl mx-auto leading-relaxed">
+                Thank you, <strong className="text-charcoal">{confirmedDetails.fullName}</strong>. Your consultation has been reserved and scheduled on our clinic calendar.
+              </p>
 
-          {isSubmitting ? (
-            <div className="mt-10 rounded-2xl glass p-10 text-center">
+              <div className="mt-8 mx-auto max-w-lg rounded-2xl border border-border bg-background/70 p-6 text-left shadow-sm">
+                <div className="grid gap-3.5 text-sm">
+                  <div className="flex justify-between border-b border-border/60 pb-2.5">
+                    <span className="text-muted-foreground uppercase text-[0.7rem] tracking-wider font-semibold">Service</span>
+                    <span className="font-medium text-charcoal">{confirmedDetails.service}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 pb-2.5">
+                    <span className="text-muted-foreground uppercase text-[0.7rem] tracking-wider font-semibold">Date & Time</span>
+                    <span className="font-medium text-charcoal">
+                      {confirmedDetails.date} at {formatTimeSlotLabel(confirmedDetails.time)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 pb-2.5">
+                    <span className="text-muted-foreground uppercase text-[0.7rem] tracking-wider font-semibold">Contact Phone</span>
+                    <span className="font-medium text-charcoal">{confirmedDetails.phone}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-muted-foreground uppercase text-[0.7rem] tracking-wider font-semibold">Status</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-900 border border-emerald-500/25">
+                      Confirmed
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-xl bg-muted/40 p-4 max-w-lg mx-auto text-xs text-muted-foreground leading-relaxed">
+                📍 <strong>Vancouver Clinic:</strong> 920 W King Edward Ave, Vancouver, BC. Please arrive 5–10 minutes before your scheduled appointment.
+              </div>
+
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfirmedAtClinic(false);
+                    setConfirmedDetails(null);
+                    setSelectedTime("");
+                  }}
+                  className="btn-gold w-full sm:w-auto"
+                >
+                  Book Another Appointment
+                </button>
+                <Link
+                  to="/"
+                  className="w-full sm:w-auto rounded-full border border-border px-6 py-3 text-xs uppercase tracking-[0.2em] font-medium text-charcoal hover:bg-muted/30 transition-all text-center"
+                >
+                  Return Home
+                </Link>
+              </div>
+            </div>
+          ) : isSubmitting ? (
+            <div className="mt-6 rounded-2xl glass p-10 text-center">
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-full gradient-gold">
                 <Check size={20} className="text-[oklch(0.18_0.005_60)]" />
               </div>
-              <h3 className="mt-6 font-serif text-2xl">Redirecting to secure checkout…</h3>
+              <h3 className="mt-6 font-serif text-2xl">
+                {paymentOption === "stripe"
+                  ? "Redirecting to secure checkout…"
+                  : "Confirming your appointment…"}
+              </h3>
               <p className="mt-3 text-sm text-charcoal/70">
-                You will be taken to Stripe to complete the $25 consultation payment.
+                {paymentOption === "stripe"
+                  ? "You will be taken to Stripe to complete the $25 consultation payment."
+                  : "Reserving your time slot and scheduling in our calendar."}
               </p>
             </div>
           ) : (
-            <form onSubmit={onSubmit} className="mt-10 grid gap-5 sm:grid-cols-2">
-              <Field label="Full Name" name="name" required />
+            <>
+              <h2 className="font-serif text-3xl">Book Consultation</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Choose your preferred service, date and time. We will confirm your appointment within
+                one business day.
+              </p>
 
-              <Field label="Email" name="email" type="email" required />
+              <form onSubmit={onSubmit} className="mt-10 grid gap-5 sm:grid-cols-2">
+                <Field label="Full Name" name="name" required />
 
-              <Field label="Phone" name="phone" type="tel" required />
+                <Field label="Email" name="email" type="email" required />
 
-              <Field
-                label="Postal Code (Greater Vancouver Area)"
-                name="postalCode"
-                placeholder="e.g. V5Z 2E2"
-                required
-                value={postalCode}
-                onChange={(e) => {
-                  setPostalCode(e.target.value);
-                  setErrorMessage(null);
-                }}
-              />
+                <Field label="Phone" name="phone" type="tel" required />
 
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="service"
-                  className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground"
-                >
-                  Service *
-                </label>
-
-                <select
-                  id="service"
-                  name="service"
+                <Field
+                  label="Postal Code (Greater Vancouver Area)"
+                  name="postalCode"
+                  placeholder="e.g. V5Z 2E2"
                   required
-                  title="Service"
-                  aria-label="Service"
-                  className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-charcoal focus:border-[var(--gold)] focus:outline-none"
-                >
-                  <option value="">Select Service</option>
-                  <option>Microneedling</option>
-                  <option>Chemical Peel</option>
-                  <option>IPL Treatments</option>
-                  <option>Laser Hair Removal</option>
-                  <option>Hydrafacial</option>
-                  <option>High-Frequency Therapy</option>
-                  <option>Microdermabrasion</option>
-                  <option>Face Sculpt</option>
-                  <option>Dermaplaning</option>
-                  <option>LED Light Therapy</option>
-                </select>
-              </div>
+                  value={postalCode}
+                  onChange={(e) => {
+                    setPostalCode(e.target.value);
+                    setErrorMessage(null);
+                  }}
+                />
 
-              <Field
-                label="Date"
-                name="date"
-                type="date"
-                required
-                min={minBookingDate}
-                value={selectedDate}
-                onChange={(e) => onDateChange(e.target.value)}
-              />
-
-              {/* SELECTABLE APPOINTMENT TIME SLOTS */}
-              <div className="sm:col-span-2 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
-                    Appointment Time Slot *
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="service"
+                    className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground"
+                  >
+                    Service *
                   </label>
-                  {selectedTime && (
-                    <span className="text-xs font-medium text-[var(--gold)]">
-                      Selected: {formatTimeSlotLabel(selectedTime)}
-                    </span>
-                  )}
+
+                  <select
+                    id="service"
+                    name="service"
+                    required
+                    title="Service"
+                    aria-label="Service"
+                    className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-charcoal focus:border-[var(--gold)] focus:outline-none"
+                  >
+                    <option value="">Select Service</option>
+                    <option>Microneedling</option>
+                    <option>Chemical Peel</option>
+                    <option>IPL Treatments</option>
+                    <option>Laser Hair Removal</option>
+                    <option>Hydrafacial</option>
+                    <option>High-Frequency Therapy</option>
+                    <option>Microdermabrasion</option>
+                    <option>Face Sculpt</option>
+                    <option>Dermaplaning</option>
+                    <option>LED Light Therapy</option>
+                  </select>
                 </div>
 
-                <input type="hidden" name="time" value={selectedTime} />
+                <Field
+                  label="Date"
+                  name="date"
+                  type="date"
+                  required
+                  min={minBookingDate}
+                  value={selectedDate}
+                  onChange={(e) => onDateChange(e.target.value)}
+                />
 
-                {!selectedDate ? (
-                  <div className="rounded-xl border border-dashed border-border/80 bg-background/50 p-6 text-center text-sm text-muted-foreground">
-                    Please select an appointment date above to view available time slots.
+                {/* SELECTABLE APPOINTMENT TIME SLOTS */}
+                <div className="sm:col-span-2 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
+                      Appointment Time Slot *
+                    </label>
+                    {selectedTime && (
+                      <span className="text-xs font-medium text-[var(--gold)]">
+                        Selected: {formatTimeSlotLabel(selectedTime)}
+                      </span>
+                    )}
                   </div>
-                ) : !isBookingDateAllowed(selectedDate) ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-center text-sm font-medium text-rose-700">
-                    Appointments cannot be booked for today. Please select tomorrow or a later date.
-                  </div>
-                ) : isLoadingAvailability ? (
-                  <div className="rounded-xl border border-dashed border-border/80 bg-background/50 p-8 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-2.5">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--gold)] border-t-transparent" />
-                    <span>Checking clinic schedule for {selectedDate}…</span>
-                  </div>
-                ) : availabilityError ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-center text-sm font-medium text-rose-700 flex flex-col items-center gap-2">
-                    <span>{availabilityError}</span>
-                    <button
-                      type="button"
-                      onClick={() => fetchAvailability(selectedDate)}
-                      className="text-xs font-semibold underline text-rose-800 hover:text-rose-950 transition-colors"
-                    >
-                      Retry Availability
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                    {(availabilitySlots || clinicSlots).map((slot) => {
-                      const isSelected = selectedTime === slot.time;
-                      const isBooked = !slot.available;
 
-                      if (isBooked) {
+                  <input type="hidden" name="time" value={selectedTime} />
+
+                  {!selectedDate ? (
+                    <div className="rounded-xl border border-dashed border-border/80 bg-background/50 p-6 text-center text-sm text-muted-foreground">
+                      Please select an appointment date above to view available time slots.
+                    </div>
+                  ) : !isBookingDateAllowed(selectedDate) ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-center text-sm font-medium text-rose-700">
+                      Appointments cannot be booked for today. Please select tomorrow or a later date.
+                    </div>
+                  ) : isLoadingAvailability ? (
+                    <div className="rounded-xl border border-dashed border-border/80 bg-background/50 p-8 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-2.5">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--gold)] border-t-transparent" />
+                      <span>Checking clinic schedule for {selectedDate}…</span>
+                    </div>
+                  ) : availabilityError ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-center text-sm font-medium text-rose-700 flex flex-col items-center gap-2">
+                      <span>{availabilityError}</span>
+                      <button
+                        type="button"
+                        onClick={() => fetchAvailability(selectedDate)}
+                        className="text-xs font-semibold underline text-rose-800 hover:text-rose-950 transition-colors"
+                      >
+                        Retry Availability
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                      {(availabilitySlots || clinicSlots).map((slot) => {
+                        const isSelected = selectedTime === slot.time;
+                        const isBooked = !slot.available;
+
+                        if (isBooked) {
+                          return (
+                            <button
+                              key={slot.time}
+                              type="button"
+                              disabled
+                              aria-disabled="true"
+                              title="This appointment slot is already booked"
+                              className="flex flex-col items-center justify-center rounded-xl py-3 px-2 text-sm font-medium border border-border/50 bg-muted/40 text-muted-foreground/50 cursor-not-allowed opacity-60 transition-all select-none"
+                            >
+                              <span className="line-through">{slot.label}</span>
+                              <span className="mt-0.5 text-[0.65rem] uppercase tracking-wider font-semibold text-rose-600/80">
+                                Booked
+                              </span>
+                            </button>
+                          );
+                        }
+
                         return (
                           <button
                             key={slot.time}
                             type="button"
-                            disabled
-                            aria-disabled="true"
-                            title="This appointment slot is already booked"
-                            className="flex flex-col items-center justify-center rounded-xl py-3 px-2 text-sm font-medium border border-border/50 bg-muted/40 text-muted-foreground/50 cursor-not-allowed opacity-60 transition-all select-none"
+                            onClick={() => {
+                              setSelectedTime(slot.time);
+                              setErrorMessage(null);
+                            }}
+                            className={`flex flex-col items-center justify-center rounded-xl py-3 px-2 text-sm font-medium transition-all ${
+                              isSelected
+                                ? "bg-[oklch(0.25_0.02_60)] text-white shadow-md ring-2 ring-[var(--gold)] ring-offset-2"
+                                : "border border-border bg-background text-charcoal hover:border-[var(--gold)] hover:bg-[var(--sand)]/30"
+                            }`}
                           >
-                            <span className="line-through">{slot.label}</span>
-                            <span className="mt-0.5 text-[0.65rem] uppercase tracking-wider font-semibold text-rose-600/80">
-                              Booked
+                            <span>{slot.label}</span>
+                            <span
+                              className={`mt-0.5 text-[0.65rem] uppercase tracking-wider ${
+                                isSelected
+                                  ? "text-[var(--gold)] font-semibold"
+                                  : "text-emerald-600 font-medium"
+                              }`}
+                            >
+                              {isSelected ? "Selected" : "Available"}
                             </span>
                           </button>
                         );
-                      }
+                      })}
+                    </div>
+                  )}
+                  <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    Dermacare Clinic serves clients within approximately 20 km of our Vancouver
+                    atelier (920 W King Edward Ave). Bookings can be made starting tomorrow onward.
+                  </p>
+                </div>
 
-                      return (
+                <div className="sm:col-span-2 flex flex-col gap-2">
+                  <label className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
+                    Additional Notes
+                  </label>
+
+                  <textarea
+                    name="message"
+                    rows={4}
+                    placeholder="Any additional information..."
+                    className="rounded-xl border border-border bg-background px-4 py-3 text-sm focus:border-[var(--gold)] focus:outline-none"
+                  />
+                </div>
+
+                {errorMessage ? (
+                  <div className="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-center text-sm font-medium text-rose-700">
+                    {errorMessage}
+                  </div>
+                ) : null}
+
+                {/* SUBMIT BUTTON & PAYMENT LINK */}
+                <div className="sm:col-span-2 flex flex-col items-center gap-2 mt-2">
+                  {paymentOption === "stripe" ? (
+                    <>
+                      <button
+                        type="submit"
+                        className="btn-gold w-full flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={isSubmitting || !isStripeConfigured}
+                        title={isStripeConfigured ? undefined : "Stripe is not configured yet"}
+                      >
+                        Pay $25 & Confirm Appointment <ArrowRight size={16} />
+                      </button>
+                      <p className="text-center text-xs text-muted-foreground">
+                        or{" "}
                         <button
-                          key={slot.time}
                           type="button"
                           onClick={() => {
-                            setSelectedTime(slot.time);
+                            setPaymentOption("skip");
                             setErrorMessage(null);
                           }}
-                          className={`flex flex-col items-center justify-center rounded-xl py-3 px-2 text-sm font-medium transition-all ${
-                            isSelected
-                              ? "bg-[oklch(0.25_0.02_60)] text-white shadow-md ring-2 ring-[var(--gold)] ring-offset-2"
-                              : "border border-border bg-background text-charcoal hover:border-[var(--gold)] hover:bg-[var(--sand)]/30"
-                          }`}
+                          className="underline hover:text-charcoal transition-colors cursor-pointer"
                         >
-                          <span>{slot.label}</span>
-                          <span
-                            className={`mt-0.5 text-[0.65rem] uppercase tracking-wider ${
-                              isSelected
-                                ? "text-[var(--gold)] font-semibold"
-                                : "text-emerald-600 font-medium"
-                            }`}
-                          >
-                            {isSelected ? "Selected" : "Available"}
-                          </span>
+                          Skip
                         </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                  Dermacare Clinic serves clients within approximately 20 km of our Vancouver
-                  atelier (920 W King Edward Ave). Bookings can be made starting tomorrow onward.
-                </p>
-              </div>
-
-              <div className="sm:col-span-2 flex flex-col gap-2">
-                <label className="text-[0.7rem] uppercase tracking-[0.28em] text-muted-foreground">
-                  Additional Notes
-                </label>
-
-                <textarea
-                  name="message"
-                  rows={5}
-                  placeholder="Any additional information..."
-                  className="rounded-xl border border-border bg-background px-4 py-3 text-sm focus:border-[var(--gold)] focus:outline-none"
-                />
-              </div>
-
-              {errorMessage ? (
-                <div className="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-center text-sm font-medium text-rose-700">
-                  {errorMessage}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="submit"
+                        className="btn-gold w-full flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={isSubmitting}
+                      >
+                        Confirm Appointment <Check size={16} />
+                      </button>
+                      <p className="text-center text-xs text-muted-foreground">
+                        or{" "}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentOption("stripe");
+                            setErrorMessage(null);
+                          }}
+                          className="underline hover:text-charcoal transition-colors cursor-pointer"
+                        >
+                          Pay $25 Advance
+                        </button>
+                      </p>
+                    </>
+                  )}
                 </div>
-              ) : null}
 
-              <button
-                type="submit"
-                className="btn-gold sm:col-span-2 mt-2 disabled:cursor-not-allowed disabled:opacity-70"
-                disabled={isSubmitting || !isStripeConfigured}
-                title={isStripeConfigured ? undefined : "Stripe is not configured yet"}
-              >
-                Pay $25 & Confirm Appointment <ArrowRight size={16} />
-              </button>
-
-              <p className="sm:col-span-2 text-center text-xs text-muted-foreground mt-2">
-                By booking, you agree to Dermacare Clinic&apos;s{" "}
-                <Link
-                  to="/privacy-policy"
-                  className="underline hover:text-charcoal transition-colors"
-                >
-                  Privacy Policy
-                </Link>
-                .
-              </p>
-            </form>
+                <p className="sm:col-span-2 text-center text-xs text-muted-foreground mt-0.5">
+                  By booking, you agree to Dermacare Clinic&apos;s{" "}
+                  <Link
+                    to="/privacy-policy"
+                    className="underline hover:text-charcoal transition-colors"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </p>
+              </form>
+            </>
           )}
         </div>
       </section>

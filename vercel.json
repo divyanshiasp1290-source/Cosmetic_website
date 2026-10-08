@@ -6,6 +6,8 @@
   "rewrites": [
     { "source": "/api/booking", "destination": "/__server/api/booking" },
     { "source": "/api/availability", "destination": "/__server/api/availability" },
+    { "source": "/api/create-checkout-session", "destination": "/__server/api/create-checkout-session" },
+    { "source": "/api/stripe-webhook", "destination": "/__server/api/stripe-webhook" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ]
 }

@@ -26,7 +26,9 @@ export default defineConfig({
         name: "api-dev-middleware",
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
-            if (req.url && req.url.startsWith("/api/availability") && req.method === "GET") {
+            if (!req.url) return next();
+
+            if (req.url.startsWith("/api/availability") && req.method === "GET") {
               try {
                 const { default: availabilityHandler } = await import("./api/availability.ts");
                 const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
@@ -34,19 +36,84 @@ export default defineConfig({
                   method: "GET",
                   headers: req.headers as HeadersInit,
                 });
-                const response = await availabilityHandler(webReq);
-                res.statusCode = response.status;
-                response.headers.forEach((value, key) => {
-                  res.setHeader(key, value);
-                });
-                const body = await response.text();
-                res.end(body);
+                const response = await availabilityHandler(webReq, res);
+                if (!res.writableEnded) {
+                  res.statusCode = response.status;
+                  response.headers.forEach((value, key) => {
+                    res.setHeader(key, value);
+                  });
+                  const body = await response.text();
+                  res.end(body);
+                }
                 return;
               } catch (err) {
                 next(err);
                 return;
               }
             }
+
+            if (req.url.startsWith("/api/create-checkout-session") && req.method === "POST") {
+              try {
+                const { default: checkoutHandler } = await import("./api/create-checkout-session.ts");
+                let rawBody = "";
+                for await (const chunk of req) {
+                  rawBody += chunk;
+                }
+                const parsedBody = rawBody ? JSON.parse(rawBody) : {};
+                const fakeReq = {
+                  method: "POST",
+                  url: req.url,
+                  headers: req.headers,
+                  body: parsedBody,
+                  json: async () => parsedBody,
+                };
+                const response = await checkoutHandler(fakeReq as any, res);
+                if (!res.writableEnded) {
+                  res.statusCode = response.status;
+                  response.headers.forEach((value, key) => {
+                    res.setHeader(key, value);
+                  });
+                  const body = await response.text();
+                  res.end(body);
+                }
+                return;
+              } catch (err) {
+                next(err);
+                return;
+              }
+            }
+
+            if (req.url.startsWith("/api/booking") && req.method === "POST") {
+              try {
+                const { default: bookingHandler } = await import("./api/booking.ts");
+                let rawBody = "";
+                for await (const chunk of req) {
+                  rawBody += chunk;
+                }
+                const parsedBody = rawBody ? JSON.parse(rawBody) : {};
+                const fakeReq = {
+                  method: "POST",
+                  url: req.url,
+                  headers: req.headers,
+                  body: parsedBody,
+                  json: async () => parsedBody,
+                };
+                const response = await bookingHandler(fakeReq as any, res);
+                if (!res.writableEnded) {
+                  res.statusCode = response.status;
+                  response.headers.forEach((value, key) => {
+                    res.setHeader(key, value);
+                  });
+                  const body = await response.text();
+                  res.end(body);
+                }
+                return;
+              } catch (err) {
+                next(err);
+                return;
+              }
+            }
+
             next();
           });
         },

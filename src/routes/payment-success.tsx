@@ -57,6 +57,7 @@ function PaymentSuccess() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...pendingBooking,
+            paymentStatus: "paid",
             stripeSessionId: sessionId || undefined,
           }),
         });

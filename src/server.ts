@@ -45,7 +45,9 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const url = new URL(request.url);
-      if (url.pathname === "/api/booking" && request.method === "POST") {
+      const pathname = url.pathname.replace(/^\/__server/, "");
+
+      if (pathname === "/api/booking" && request.method === "POST") {
         const body = await request.json().catch(() => null);
 
         if (!body) {
@@ -57,28 +59,34 @@ export default {
 
         const fakeReq = {
           method: request.method,
+          url: request.url,
+          headers: request.headers,
+          body,
           json: async () => body,
         };
 
         return (bookingApi as any)(fakeReq, {});
       }
 
-      if (url.pathname === "/api/create-checkout-session" && request.method === "POST") {
+      if (pathname === "/api/create-checkout-session" && request.method === "POST") {
         const body = await request.json().catch(() => null);
 
         const fakeReq = {
           method: request.method,
+          url: request.url,
+          headers: request.headers,
+          body,
           json: async () => body,
         };
 
         return (createCheckoutSessionApi as any)(fakeReq, {});
       }
 
-      if (url.pathname === "/api/availability" && request.method === "GET") {
+      if (pathname === "/api/availability" && request.method === "GET") {
         return (availabilityApi as any)(request, {});
       }
 
-      if (url.pathname === "/api/stripe-webhook" && request.method === "POST") {
+      if (pathname === "/api/stripe-webhook" && request.method === "POST") {
         return (stripeWebhookApi as any)(request, {});
       }
 
