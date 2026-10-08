@@ -6,7 +6,7 @@ import {
   isBookingDateAllowed,
   isClinicTimeSlot,
   getClinicDateTimeMs,
-} from "./validation.ts";
+} from "./validation";
 
 type JsonResponse = Record<string, unknown>;
 
