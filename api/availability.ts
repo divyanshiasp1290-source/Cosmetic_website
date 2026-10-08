@@ -1,12 +1,89 @@
 import { google } from "googleapis";
-import {
-  CLINIC_TIMEZONE,
-  CLINIC_TIME_SLOTS,
-  formatTimeSlotLabel,
-  isBookingDateAllowed,
-  isClinicTimeSlot,
-  getClinicDateTimeMs,
-} from "./validation";
+export const CLINIC_TIMEZONE = process.env.CLINIC_TIMEZONE || "America/Vancouver";
+
+/**
+ * Standard clinic operating hours: Monday – Sunday, 10:00 AM – 6:00 PM (1-hour slots).
+ */
+export const CLINIC_TIME_SLOTS = [
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+] as const;
+
+export type ClinicTimeSlot = (typeof CLINIC_TIME_SLOTS)[number];
+
+export function isClinicTimeSlot(time: unknown): time is ClinicTimeSlot {
+  return typeof time === "string" && (CLINIC_TIME_SLOTS as readonly string[]).includes(time);
+}
+
+export function formatTimeSlotLabel(time: string): string {
+  const [hStr, mStr] = time.split(":");
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return time;
+  const period = h >= 12 ? "PM" : "AM";
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${displayH}:${mStr || "00"} ${period}`;
+}
+
+/**
+ * Returns today's and tomorrow's date strings (YYYY-MM-DD) in the clinic's timezone (America/Vancouver).
+ */
+export function getClinicDates(timeZone = CLINIC_TIMEZONE) {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayStr = formatter.format(now);
+
+  const [y, m, d] = todayStr.split("-").map(Number);
+  const todayNoonUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const tomorrowNoonUtc = new Date(todayNoonUtc.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowStr = formatter.format(tomorrowNoonUtc);
+
+  return { todayStr, tomorrowStr };
+}
+
+/**
+ * Converts a date string (YYYY-MM-DD) and optional time (HH:mm) in clinic timezone
+ * (America/Vancouver) to epoch milliseconds in UTC.
+ */
+export function getClinicDateTimeMs(
+  date: string,
+  time = "00:00",
+  timeZone = CLINIC_TIMEZONE,
+): number {
+  const noonUtc = new Date(`${date}T12:00:00Z`);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "longOffset",
+  });
+  const tzPart = fmt.formatToParts(noonUtc).find((p) => p.type === "timeZoneName")?.value;
+  let offset = "-07:00";
+  if (tzPart && tzPart.startsWith("GMT")) {
+    offset = tzPart.replace("GMT", "");
+  }
+  const cleanTime = time.length === 5 ? `${time}:00` : time;
+  return new Date(`${date}T${cleanTime}${offset}`).getTime();
+}
+
+/**
+ * Validates appointment booking date.
+ * Rule: TODAY cannot be booked; TOMORROW and later can be booked.
+ */
+export function isBookingDateAllowed(dateStr: string, timeZone = CLINIC_TIMEZONE): boolean {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const { tomorrowStr } = getClinicDates(timeZone);
+  return dateStr >= tomorrowStr;
+}
+
 
 type JsonResponse = Record<string, unknown>;
 
